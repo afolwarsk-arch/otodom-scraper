@@ -48,6 +48,7 @@ async function wyslijOferty(oferty, miasto) {
     }, { headers: headers() });
 
     wyslano++;
+    await new Promise(r => setTimeout(r, 1000));
   }
 
   return wyslano;
