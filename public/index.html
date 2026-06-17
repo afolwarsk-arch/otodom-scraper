@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Otodom Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #0d0b1f; --bg-card: #1a1633; --text: #f3f0ff; --muted: #a89fd6;
+    --accent1: #ff2d95; --accent2: #7a2dff; --accent3: #00e5ff; --accent4: #b6ff00;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(1200px 800px at 80% -10%, #2a1f4d 0%, var(--bg) 55%);
+    color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; padding: 24px; min-height: 100vh; }
+  h1 { font-size: 2rem; font-weight: 900; margin: 0 0 4px; }
+  h1 span { background: linear-gradient(90deg, var(--accent1), var(--accent3)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .subtitle { color: var(--muted); margin: 0 0 24px; }
+
+  .form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  input, select { background: var(--bg-card); border: 2px solid var(--accent2); border-radius: 8px;
+    padding: 10px 14px; color: var(--text); font-size: .95rem; min-width: 180px; outline: none; }
+  input:focus, select:focus { border-color: var(--accent3); }
+  select option { background: var(--bg-card); }
+  .btn { background: linear-gradient(90deg, var(--accent3), var(--accent4)); color: #0d0b1f;
+    border: none; border-radius: 999px; padding: 11px 22px; font-weight: 800; font-size: .95rem; cursor: pointer; }
+  .btn:hover { opacity: .9; }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  #status { margin-bottom: 20px; padding: 12px 16px; border-radius: 10px; font-size: .95rem; display: none; }
+  #status.ok { background: rgba(0,229,255,.12); border: 1px solid var(--accent3); color: var(--accent3); }
+  #status.err { background: rgba(255,45,149,.12); border: 1px solid var(--accent1); color: var(--accent1); }
+
+  .kpis { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 24px; }
+  .kpi { background: var(--bg-card); border-radius: 14px; padding: 16px 20px; min-width: 140px;
+    box-shadow: 0 0 20px rgba(122,45,255,.2); flex: 1; }
+  .kpi .v { font-size: 1.6rem; font-weight: 900; }
+  .kpi .l { color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .chart-card { background: var(--bg-card); border-radius: 14px; padding: 18px; box-shadow: 0 0 20px rgba(0,229,255,.1); }
+  .chart-card h3 { margin: 0 0 12px; font-size: 1rem; color: var(--muted); }
+
+  .filtry { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; align-items: flex-end; }
+  .filtry h2 { width: 100%; margin: 0 0 4px; font-size: 1rem; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th { text-align: left; padding: 10px 12px; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid rgba(168,159,214,.2); }
+  td { padding: 10px 12px; border-bottom: 1px solid rgba(168,159,214,.08); }
+  tr:hover td { background: rgba(122,45,255,.08); }
+  a { color: var(--accent3); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .table-wrap { background: var(--bg-card); border-radius: 14px; padding: 18px; overflow-x: auto; }
+  .table-wrap h3 { margin: 0 0 14px; font-size: 1.1rem; }
+
+  @media (max-width: 600px) { .charts { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<h1>Otodom <span>Dashboard</span></h1>
+<p class="subtitle">Pobieraj oferty, śledź ceny, dostawaj powiadomienia na Discord.</p>
+
+<!-- Formularz pobierania -->
+<div class="form-row">
+  <div class="form-group">
+    <label for="miasto">Miasto</label>
+    <input id="miasto" type="text" placeholder="np. Wrocław..." value="Wrocław">
+  </div>
+  <div class="form-group">
+    <label for="typ">Typ</label>
+    <select id="typ">
+      <option value="mieszkanie">Mieszkanie</option>
+      <option value="dom">Dom</option>
+      <option value="dzialka">Działka</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="pokMin">Pokoje (min)</label>
+    <select id="pokMin">
+      <option value="">—</option>
+      <option value="ONE">1</option>
+      <option value="TWO">2</option>
+      <option value="THREE">3</option>
+      <option value="FOUR">4+</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="pokMax">Pokoje (max)</label>
+    <select id="pokMax">
+      <option value="">—</option>
+      <option value="ONE">1</option>
+      <option value="TWO">2</option>
+      <option value="THREE">3</option>
+      <option value="FOUR">4+</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="cenaMin">Cena od (zł)</label>
+    <input id="cenaMin" type="number" placeholder="np. 300000" style="min-width:120px">
+  </div>
+  <div class="form-group">
+    <label for="cenaMax">Cena do (zł)</label>
+    <input id="cenaMax" type="number" placeholder="np. 800000" style="min-width:120px">
+  </div>
+  <button class="btn" id="btnPobierz" onclick="pobierz()">Pobierz 10 najnowszych</button>
+</div>
+
+<div id="status"></div>
+
+<!-- KPI -->
+<div class="kpis">
+  <div class="kpi"><div class="v" id="kpiLiczba">—</div><div class="l">Oferty w bazie</div></div>
+  <div class="kpi"><div class="v" id="kpiCena">—</div><div class="l">Średnia cena</div></div>
+  <div class="kpi"><div class="v" id="kpiM2">—</div><div class="l">Średnia cena/m²</div></div>
+</div>
+
+<!-- Filtry dashboardu -->
+<div class="filtry">
+  <h2>Filtruj dashboard</h2>
+  <div class="form-group">
+    <label>Miasto</label>
+    <select id="filtMiasto" onchange="odswiezDashboard()"><option value="">Wszystkie</option></select>
+  </div>
+  <div class="form-group">
+    <label>Liczba pokojów (od)</label>
+    <select id="filtPokojeMin" onchange="odswiezDashboard()">
+      <option value="">—</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Liczba pokojów (do)</label>
+    <select id="filtPokojeMax" onchange="odswiezDashboard()">
+      <option value="">—</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4+</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Cena od (zł)</label>
+    <input id="filtCenaMin" type="number" placeholder="np. 300000" style="min-width:130px" oninput="odswiezDashboard()">
+  </div>
+  <div class="form-group">
+    <label>Cena do (zł)</label>
+    <input id="filtCenaMax" type="number" placeholder="np. 800000" style="min-width:130px" oninput="odswiezDashboard()">
+  </div>
+  <button class="btn" style="background:linear-gradient(90deg,var(--accent2),var(--accent1))" onclick="resetFiltry()">Resetuj filtry</button>
+</div>
+
+<!-- Wykresy -->
+<div class="charts">
+  <div class="chart-card">
+    <h3>Rozkład cen (zł)</h3>
+    <canvas id="chartCeny"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Rozkład metraży (m²)</h3>
+    <canvas id="chartMetraz"></canvas>
+  </div>
+</div>
+
+<!-- Tabela ofert -->
+<div class="table-wrap">
+  <h3>Ostatnie oferty</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Tytuł</th>
+        <th>Pokoje</th>
+        <th>Cena</th>
+        <th>Cena/m²</th>
+        <th>Metraż</th>
+        <th>Miasto</th>
+        <th>Pobrano</th>
+      </tr>
+    </thead>
+    <tbody id="tabela"></tbody>
+  </table>
+</div>
+
+<script>
+let chartCeny = null;
+let chartMetraz = null;
+
+function fmt(n, suffix = '') {
+  if (n == null) return '—';
+  return n.toLocaleString('pl-PL') + suffix;
+}
+
+async function pobierz() {
+  const miasto = document.getElementById('miasto').value.trim();
+  if (!miasto) { pokazStatus('Wpisz nazwę miasta', false); return; }
+
+  const btn = document.getElementById('btnPobierz');
+  btn.disabled = true;
+  btn.textContent = 'Pobieram...';
+  pokazStatus('', null);
+
+  try {
+    const r = await fetch('/api/pobierz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        miasto,
+        typ: document.getElementById('typ').value,
+        pokoje_min: document.getElementById('pokMin').value,
+        pokoje_max: document.getElementById('pokMax').value,
+        cena_min: document.getElementById('cenaMin').value,
+        cena_max: document.getElementById('cenaMax').value
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Błąd serwera');
+
+    if (d.brakOfert) {
+      pokazStatus(`Brak ofert sprzedaży mieszkań dla "${miasto}" na Otodom — spróbuj większego miasta.`, false);
+    } else {
+      const discordInfo = d.discord > 0 ? ` · ${d.discord} wysłano na Discord` : '';
+      pokazStatus(`Pobrano ${d.pobrano} ofert · ${d.nowe} nowych${discordInfo}`, true);
+    }
+    await odswiezDashboard();
+  } catch (e) {
+    pokazStatus('Błąd: ' + e.message, false);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Pobierz 10 najnowszych';
+  }
+}
+
+function pokazStatus(msg, ok) {
+  const el = document.getElementById('status');
+  if (!msg) { el.style.display = 'none'; return; }
+  el.textContent = msg;
+  el.className = ok ? 'ok' : 'err';
+  el.style.display = 'block';
+}
+
+function resetFiltry() {
+  ['filtMiasto', 'filtPokojeMin', 'filtPokojeMax'].forEach(id => document.getElementById(id).value = '');
+  ['filtCenaMin', 'filtCenaMax'].forEach(id => document.getElementById(id).value = '');
+  odswiezDashboard();
+}
+
+async function odswiezDashboard() {
+  const miasto = document.getElementById('filtMiasto').value;
+  const pokojeMin = document.getElementById('filtPokojeMin').value;
+  const pokojeMax = document.getElementById('filtPokojeMax').value;
+  const cenaMin = document.getElementById('filtCenaMin').value;
+  const cenaMax = document.getElementById('filtCenaMax').value;
+  const params = new URLSearchParams();
+  if (miasto) params.set('miasto', miasto);
+  if (pokojeMin) params.set('pokoje_min', pokojeMin);
+  if (pokojeMax) params.set('pokoje_max', pokojeMax);
+  if (cenaMin) params.set('cena_min', cenaMin);
+  if (cenaMax) params.set('cena_max', cenaMax);
+
+  const r = await fetch('/api/statystyki?' + params);
+  const d = await r.json();
+
+  // KPI
+  document.getElementById('kpiLiczba').textContent = fmt(d.kpi.liczba);
+  document.getElementById('kpiCena').textContent = d.kpi.srednia_cena ? fmt(d.kpi.srednia_cena, ' zł') : '—';
+  document.getElementById('kpiM2').textContent = d.kpi.srednia_cena_m2 ? fmt(d.kpi.srednia_cena_m2, ' zł') : '—';
+
+  // Filtry — uzupełnij opcje
+  const selM = document.getElementById('filtMiasto');
+  const curM = selM.value;
+  selM.innerHTML = '<option value="">Wszystkie</option>' +
+    d.miasta.map(m => `<option value="${m.miasto}" ${m.miasto === curM ? 'selected' : ''}>${m.miasto}</option>`).join('');
+
+  // Wykres cen
+  const cLabels = d.cenyBins.map(b => fmt(b.bin, ' zł'));
+  const cData = d.cenyBins.map(b => b.ile);
+  if (chartCeny) chartCeny.destroy();
+  chartCeny = new Chart(document.getElementById('chartCeny'), {
+    type: 'bar',
+    data: { labels: cLabels, datasets: [{ label: 'Liczba ofert', data: cData,
+      backgroundColor: 'rgba(255,45,149,.7)', borderColor: '#ff2d95', borderWidth: 1 }] },
+    options: { plugins: { legend: { display: false } }, scales: {
+      x: { ticks: { color: '#a89fd6', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.05)' } },
+      y: { ticks: { color: '#a89fd6' }, grid: { color: 'rgba(255,255,255,.05)' } }
+    }}
+  });
+
+  // Wykres metraży
+  const mLabels = d.metrazBins.map(b => `${b.bin} m²`);
+  const mData = d.metrazBins.map(b => b.ile);
+  if (chartMetraz) chartMetraz.destroy();
+  chartMetraz = new Chart(document.getElementById('chartMetraz'), {
+    type: 'bar',
+    data: { labels: mLabels, datasets: [{ label: 'Liczba ofert', data: mData,
+      backgroundColor: 'rgba(0,229,255,.6)', borderColor: '#00e5ff', borderWidth: 1 }] },
+    options: { plugins: { legend: { display: false } }, scales: {
+      x: { ticks: { color: '#a89fd6', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.05)' } },
+      y: { ticks: { color: '#a89fd6' }, grid: { color: 'rgba(255,255,255,.05)' } }
+    }}
+  });
+
+  // Tabela
+  const tbody = document.getElementById('tabela');
+  tbody.innerHTML = d.lista.map(o => `
+    <tr>
+      <td><a href="${o.url}" target="_blank">${o.tytul}</a></td>
+      <td>${o.pokoje ? o.pokoje + ' pok.' : '—'}</td>
+      <td>${fmt(o.cena, ' zł')}</td>
+      <td>${fmt(o.cena_m2, ' zł')}</td>
+      <td>${fmt(o.metraz, ' m²')}</td>
+      <td>${o.miasto}</td>
+      <td>${o.pobrano_at ? o.pobrano_at.slice(0, 16) : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+// Załaduj dashboard przy starcie
+odswiezDashboard();
+</script>
+</body>
+</html>

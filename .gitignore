@@ -1,0 +1,8 @@
+node_modules/
+.env
+oferty.db
+*.db
+*.sqlite
+suggest-screenshot.png
+nextdata-debug.json
+page-debug.html
