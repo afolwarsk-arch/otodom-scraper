@@ -11,6 +11,8 @@ db.exec(`
     cena REAL,
     cena_m2 REAL,
     metraz REAL,
+    pokoje INTEGER,
+    typ TEXT,
     miasto TEXT,
     wojewodztwo TEXT,
     url TEXT,
