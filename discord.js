@@ -1,22 +1,6 @@
-require('dotenv').config();
-const { Client, GatewayIntentBits, PermissionFlagsBits, ChannelType } = require('discord.js');
+const axios = require('axios');
 
-let client = null;
-
-function getClient() {
-  if (!client) {
-    client = new Client({ intents: [GatewayIntentBits.Guilds] });
-  }
-  return client;
-}
-
-async function ensureConnected() {
-  const c = getClient();
-  if (c.isReady()) return c;
-  await c.login(process.env.DISCORD_TOKEN);
-  await new Promise(res => c.once('ready', res));
-  return c;
-}
+const BASE = 'https://discord.com/api/v10';
 
 function slugify(str) {
   return str.toLowerCase()
@@ -26,37 +10,43 @@ function slugify(str) {
     .replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
+function headers() {
+  return { Authorization: `Bot ${process.env.DISCORD_TOKEN}`, 'Content-Type': 'application/json' };
+}
+
+async function znajdzLubStworzKanal(guildId, channelName, miasto) {
+  const { data: channels } = await axios.get(`${BASE}/guilds/${guildId}/channels`, { headers: headers() });
+  const existing = channels.find(ch => ch.name === channelName && ch.type === 0);
+  if (existing) return existing.id;
+
+  const { data: newChannel } = await axios.post(`${BASE}/guilds/${guildId}/channels`, {
+    name: channelName,
+    type: 0,
+    topic: `Oferty mieszkań — ${miasto}`
+  }, { headers: headers() });
+
+  return newChannel.id;
+}
+
 async function wyslijOferty(oferty, miasto) {
   if (!process.env.DISCORD_TOKEN || !process.env.DISCORD_GUILD_ID) {
     console.warn('Brak DISCORD_TOKEN lub DISCORD_GUILD_ID — pomijam wysyłkę');
     return 0;
   }
 
-  const c = await ensureConnected();
-  const guild = await c.guilds.fetch(process.env.DISCORD_GUILD_ID);
   const channelName = slugify(miasto);
-
-  let channel = guild.channels.cache.find(
-    ch => ch.name === channelName && ch.type === ChannelType.GuildText
-  );
-
-  if (!channel) {
-    channel = await guild.channels.create({
-      name: channelName,
-      type: ChannelType.GuildText,
-      topic: `Oferty mieszkań — ${miasto}`
-    });
-  }
+  const channelId = await znajdzLubStworzKanal(process.env.DISCORD_GUILD_ID, channelName, miasto);
 
   let wyslano = 0;
   for (const o of oferty) {
     const cena = o.cena ? `${o.cena.toLocaleString('pl-PL')} zł` : 'brak ceny';
-    const m2 = o.cena_m2 ? `${o.cena_m2.toLocaleString('pl-PL')} zł/m²` : '';
-    const metraz = o.metraz ? `${o.metraz} m²` : '';
+    const m2 = o.cena_m2 ? ` · ${o.cena_m2.toLocaleString('pl-PL')} zł/m²` : '';
+    const metraz = o.metraz ? ` · ${o.metraz} m²` : '';
 
-    await channel.send(
-      `🏠 **${o.tytul}**\n💰 ${cena}${m2 ? ' · ' + m2 : ''}${metraz ? ' · ' + metraz : ''}\n🔗 ${o.url}`
-    );
+    await axios.post(`${BASE}/channels/${channelId}/messages`, {
+      content: `🏠 **${o.tytul}**\n💰 ${cena}${m2}${metraz}\n🔗 ${o.url}`
+    }, { headers: headers() });
+
     wyslano++;
   }
 
