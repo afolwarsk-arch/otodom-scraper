@@ -1,5 +1,7 @@
 const Database = require('better-sqlite3');
-const db = new Database('oferty.db');
+const path = require('path');
+const dbPath = process.env.VERCEL ? '/tmp/oferty.db' : path.join(__dirname, 'oferty.db');
+const db = new Database(dbPath);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS oferty (
